@@ -21,8 +21,10 @@
 
 #include "shell.h"
 #include "chprintf.h"
+#include <stdlib.h>
 
 #include "MPU6050.h"
+#include "CanBusHandler.hpp"
 
 using namespace chibios_rt;
 
@@ -75,8 +77,18 @@ static void cmd_write(BaseSequentialStream *chp, int argc, char *argv[])
   chprintf(chp, "\r\n\nstopped\r\n");
 }
 
+static void setCurrent(BaseSequentialStream *chp, int argc, char *argv[])
+{
+  if (argc == 1)
+  {
+    CanBusHandler::current_1 =
+        strtol(argv[0], NULL, 0);
+  }
+}
+
 static const ShellCommand commands[] = {
     {"write", cmd_write},
+    {"sc", setCurrent},
     {NULL, NULL}};
 
 static const ShellConfig shell_cfg1 = {
@@ -142,9 +154,15 @@ BlinkerThread blinker;
 
 static const I2CConfig i2c2cfg = {
     OPMODE_I2C,
-    400000,
+    100000,
     FAST_DUTY_CYCLE_2,
 };
+
+static const SerialConfig sd1Config =
+    {115200,
+     0,
+     USART_CR2_STOP1_BITS,
+     0};
 
 /*
  * Application entry point.
@@ -161,14 +179,11 @@ int main(void)
    */
   halInit();
   chSysInit();
-  static const SerialConfig sd1Config =
-      {115200,
-       0,
-       USART_CR2_STOP1_BITS,
-       0};
 
+  /*
+   * Activates the CAN driver 1, Serial Driver 1, and I2C 2.
+   */
   sdStart(&SD1, &sd1Config);
-
   i2cStart(&I2CD2, &i2c2cfg);
 
   /*
@@ -181,8 +196,15 @@ int main(void)
    */
   blinker.start(NORMALPRIO);
 
+  /**
+ * start the can bus test
+ * 
+ */
+  CanBusHandler::caninit(&CAND1);
+
   sdWrite(&SD1, (const uint8_t *)"\n\n\n\n", 4);
-  
+
+  //initiallize the mpu6050 reader
   chThdSleepMilliseconds(500);
   MPU6050(MPU6050_ADDRESS_AD0_LOW);
   MPUinitialize();
@@ -190,7 +212,6 @@ int main(void)
            MPUtestConnection() ? "OK" : "FAILED");
 
   chThdSleepMilliseconds(500);
-
 
   /*
    * Shell manager initialization.
@@ -204,14 +225,18 @@ int main(void)
   /*
    * Normal main() thread activity
    */
+  int16_t rx = 0, ry = 0, rz = 0, ax = 0, ay = 0, az = 0;
   while (true)
   {
+    MPUgetRotation(&rx, &ry, &rx);
+    MPUgetAcceleration(&ax, &ay, &az);
     chprintf((BaseSequentialStream *)&SD1,
-             "ax: %d ay:%d az:%d\n",
-             MPUgetAccelerationX(),
-             MPUgetAccelerationY(),
-             MPUgetAccelerationZ());
-
-    chThdSleepMilliseconds(100);
+             "rx: %d ry:%d rz:%d ax: %d ay:%d az:%d\n",
+             rx, ry, rz, ax, ay, az);
+    chprintf((BaseSequentialStream *)&SD1,
+             "r: %D\n", CanBusHandler::receiveCount);
+    chprintf((BaseSequentialStream *)&SD1,
+             "r: %d\n", CanBusHandler::f.SID);
+    chThdSleepMilliseconds(500);
   }
 }
