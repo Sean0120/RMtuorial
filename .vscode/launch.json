@@ -5,12 +5,31 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "GDB Debug",
             "type": "gdb",
             "request": "launch",
-            "target": "${workspaceRoot}/build/RMInternalDev.elf",
+            "name": "Flash",
+            "target": "./build/RMInternalDev.elf",
             "cwd": "${workspaceRoot}",
-            "gdbpath": "/usr/bin/arm-none-eabi-gdb",
+            "gdbpath": "arm-none-eabi-gdb.exe",
+            "autorun": [
+                "target remote localhost:3333",
+                "monitor halt",
+                "monitor flash probe 0",
+                "monitor halt",
+                "monitor wait_halt",
+                "monitor stm32f1x mass_erase 0",
+                "monitor wait_halt",
+                "monitor flash write_bank 0 ./build/RMInternalDev.bin 0",
+                "monitor reset"
+            ]
+        },
+        {
+            "type": "gdb",
+            "request": "launch",
+            "name": "Debug Microcontroller",
+            "target": "./build/RMInternalDev.elf",
+            "cwd": "${workspaceRoot}",
+            "gdbpath": "arm-none-eabi-gdb.exe",
             "autorun": [
                 "target remote localhost:3333",
                 "symbol-file ./build/RMInternalDev.elf",
