@@ -14,6 +14,14 @@
     limitations under the License.
 */
 
+/**
+ * @brief This file is based on the MAPLE MINI example from ChibiOS
+ * 
+ * @file main.cpp
+ * @author Alex Au
+ * @date 2018-09-11
+ */
+
 #include "ch.hpp"
 
 #include "ch.h"
@@ -22,60 +30,21 @@
 #include "shell.h"
 #include "chprintf.h"
 #include <stdlib.h>
+#include <cstring>
 
 #include "MPU6050.h"
 #include "CanBusHandler.hpp"
 
 using namespace chibios_rt;
 
-/*===========================================================================*/
-/* Command line related.                                                     */
-/*===========================================================================*/
+/**
+ * Commands
+ */
 
+/**
+ * @brief the working area for the command shell thread, where the thread's own heap and stack is located
+ */
 #define SHELL_WA_SIZE THD_WORKING_AREA_SIZE(2048)
-
-/* Can be measured using dd if=/dev/xxxx of=/dev/null bs=512 count=10000.*/
-static void cmd_write(BaseSequentialStream *chp, int argc, char *argv[])
-{
-  static uint8_t buf[] =
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-
-  (void)argv;
-  if (argc > 0)
-  {
-    chprintf(chp, "Usage: write\r\n");
-    return;
-  }
-
-  while (chnGetTimeout((BaseChannel *)chp, TIME_IMMEDIATE) == Q_TIMEOUT)
-  {
-#if 1
-    /* Writing in channel mode.*/
-    chnWrite(&SD1, buf, sizeof buf - 1);
-#else
-    /* Writing in buffer mode.*/
-    (void)obqGetEmptyBufferTimeout(&SDU1.obqueue, TIME_INFINITE);
-    memcpy(SDU1.obqueue.ptr, buf, SERIAL_USB_BUFFERS_SIZE);
-    obqPostFullBuffer(&SDU1.obqueue, SERIAL_USB_BUFFERS_SIZE);
-#endif
-  }
-  chprintf(chp, "\r\n\nstopped\r\n");
-}
 
 static void setCurrent(BaseSequentialStream *chp, int argc, char *argv[])
 {
@@ -86,9 +55,17 @@ static void setCurrent(BaseSequentialStream *chp, int argc, char *argv[])
   }
 }
 
+bool logEnable = true;
+
+static void toggleLog(BaseSequentialStream *chp, int argc, char *argv[])
+{
+  logEnable = !logEnable;
+  chprintf(chp, "\r\n\log mode %s\r\n", logEnable ? "started" : "stopped");
+}
+
 static const ShellCommand commands[] = {
-    {"write", cmd_write},
     {"sc", setCurrent},
+    {"log", toggleLog},
     {NULL, NULL}};
 
 static const ShellConfig shell_cfg1 = {
@@ -197,9 +174,9 @@ int main(void)
   blinker.start(NORMALPRIO);
 
   /**
- * start the can bus test
- * 
- */
+  * start the can bus test
+  * 
+  */
   CanBusHandler::caninit(&CAND1);
 
   sdWrite(&SD1, (const uint8_t *)"\n\n\n\n", 4);
@@ -217,7 +194,12 @@ int main(void)
    * Shell manager initialization.
    */
   shellInit();
-  //start the shell thread over UART1
+
+  /**
+   * @brief start the shell thread over UART1
+   * notice that here the thread is created dynamically
+   * calling this statement will occupy the heap of the caller thread
+   */
   thread_t *shelltp = chThdCreateFromHeap(NULL, SHELL_WA_SIZE,
                                           "shell", NORMALPRIO + 1,
                                           shellThread, (void *)&shell_cfg1);
@@ -228,15 +210,22 @@ int main(void)
   int16_t rx = 0, ry = 0, rz = 0, ax = 0, ay = 0, az = 0;
   while (true)
   {
+    systime_t startT = chibios_rt::System::getTime();
     MPUgetRotation(&rx, &ry, &rx);
     MPUgetAcceleration(&ax, &ay, &az);
-    chprintf((BaseSequentialStream *)&SD1,
-             "rx: %d ry:%d rz:%d ax: %d ay:%d az:%d\n",
-             rx, ry, rz, ax, ay, az);
-    chprintf((BaseSequentialStream *)&SD1,
-             "r: %D\n", CanBusHandler::receiveCount);
-    chprintf((BaseSequentialStream *)&SD1,
-             "r: %d\n", CanBusHandler::f.SID);
-    chThdSleepMilliseconds(500);
+    if (logEnable)
+    {
+      chprintf((BaseSequentialStream *)&SD1,
+               "rx: %d ry:%d rz:%d ax: %d ay:%d az:%d\n",
+               rx, ry, rz, ax, ay, az);
+      chprintf((BaseSequentialStream *)&SD1,
+               "rCnt: %D\n", CanBusHandler::receiveCount);
+      chprintf((BaseSequentialStream *)&SD1,
+               "rid: %d\n", CanBusHandler::f.SID);
+      chprintf((BaseSequentialStream *)&SD1,
+               "chibios_rt::System::getTime: %d\n", startT);
+    }
+    chibios_rt::BaseThread::sleepUntil(startT + TIME_MS2I(500));
+    //chThdSleepMilliseconds(500);
   }
 }

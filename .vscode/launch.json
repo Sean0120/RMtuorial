@@ -16,12 +16,10 @@
             "gdbpath": "arm-none-eabi-gdb.exe",
             "autorun": [
                 "target remote localhost:3333",
+                "monitor reset",
                 "monitor halt",
                 "monitor flash probe 0",
-                "monitor halt",
-                "monitor wait_halt",
                 "monitor stm32f1x mass_erase 0",
-                "monitor wait_halt",
                 "monitor flash write_bank 0 ./build/RMInternalDev.bin 0",
                 "monitor reset"
             ]

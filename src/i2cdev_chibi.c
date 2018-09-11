@@ -48,6 +48,14 @@ THE SOFTWARE.
 ===============================================
 */
 
+/**
+ * @brief This file is modified to compensate for the hardware limitation of the MCU when sending one byte
+ * 
+ * @file i2cdev_chibi.c
+ * @author Alex Au
+ * @date 2018-09-11
+ */
+
 #include "ch.h"
 #include "chtime.h"
 #include "hal.h"
