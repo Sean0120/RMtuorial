@@ -10,6 +10,9 @@
             "name": "Flash",
             "target": "./build/RMInternalDev.elf",
             "cwd": "${workspaceRoot}",
+            "linux": {
+                "gdbpath": "arm-none-eabi-gdb",
+            },
             "gdbpath": "arm-none-eabi-gdb.exe",
             "autorun": [
                 "target remote localhost:3333",
@@ -26,13 +29,16 @@
         {
             "type": "gdb",
             "request": "launch",
+            "linux": {
+                "gdbpath": "arm-none-eabi-gdb",
+            },
             "name": "Debug Microcontroller",
             "target": "./build/RMInternalDev.elf",
             "cwd": "${workspaceRoot}",
             "gdbpath": "arm-none-eabi-gdb.exe",
             "autorun": [
-                "target remote localhost:3333",
                 "symbol-file ./build/RMInternalDev.elf",
+                "target remote localhost:3333",
                 "monitor reset"
             ]
         }

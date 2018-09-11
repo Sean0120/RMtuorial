@@ -110,7 +110,7 @@ include $(CHIBIOS)/os/hal/lib/streams/streams.mk
 include $(CHIBIOS)/os/various/shell/shell.mk
 
 # Define linker script file here
-LDSCRIPT = ./STM32F103xB.ld
+LDSCRIPT = ./STM32F103x8.ld
 
 # C sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
